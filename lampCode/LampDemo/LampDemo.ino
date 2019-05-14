@@ -3,7 +3,6 @@
 #include <Adafruit_NeoPixel.h> //RGB strip library
 #include <ArduinoJson.h>
 #define PIN 14 //set up rgb strip
-StaticJsonBuffer<200> jsonBuffer;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(5, PIN, NEO_GRB + NEO_KHZ800); // intalize the RGB strip
 
 // Your WiFi credentials.
@@ -29,33 +28,40 @@ void setup()
   strip.show(); // Initialize all leds to 'off'
 
 }
-
+const size_t capacity = JSON_OBJECT_SIZE(3) + JSON_ARRAY_SIZE(2) + 60;
+DynamicJsonDocument doc(capacity);
 void loop() {
 
   if (WiFi.status() == WL_CONNECTED) { //Check WiFi connection status
 
     HTTPClient http;  //Declare an object of class HTTPClient
 
-    http.begin("http://10.1.9.254:3000/v2/lampState");  //Specify request destination. This should be the ip of the computer that is acting as the server.
+    http.begin("http://10.1.10.10:3000/v2/lampState");  //Specify request destination. This should be the ip of the computer that is acting as the server.
     int httpCode = http.GET(); //Send the request
 
     if (httpCode > 0) { //Check the returning code to see if the request was sucessfull
 
-      char json[] = http.getString();   //Get the request response payload
-      JsonObject& root = jsonBuffer.parseObject(json);
-      if (!root.success()) {
-        Serial.println("parseObject() failed");
-        return false;
+
+      DeserializationError error = deserializeJson(doc, http.getString());
+      if (error) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.c_str());
+        return;
       }
 
-      const bool* turnOn = root["on"];
+      // Extract values
+      Serial.println(F("Response:"));
+      Serial.println(doc["on"].as<bool>());
+      Serial.println(doc["color"].as<String>());
+      bool turnOn = doc["on"].as<bool>();
       Serial.println(turnOn);
-      if (turnOn) {
+      if (turnOn == true) {
         //turn on light
         strip.setPixelColor(0, 255, 255, 255);
         strip.setPixelColor(1, 255, 255, 255);
         strip.setPixelColor(2, 255, 255, 255);
-        strip.setPixelColor(3, 255, 255, 255); //parameters are (LED number in chain, Red 0-255, Green 0-255, Blue 0-255)
+        strip.setPixelColor(3, 255, 255, 255);
+        strip.setPixelColor(4, 255, 255, 255);//parameters are (LED number in chain, Red 0-255, Green 0-255, Blue 0-255)
         strip.show();
       } else {
         //turn off light
@@ -63,6 +69,7 @@ void loop() {
         strip.setPixelColor(1, 0, 0, 0);
         strip.setPixelColor(2, 0, 0, 0);
         strip.setPixelColor(3, 0, 0, 0);
+        strip.setPixelColor(4, 0, 0, 0);
         strip.show();
       }
       //Print the response payload
@@ -77,6 +84,6 @@ void loop() {
 
   }
 
-  delay(1000); //wait 1 second before requesting again
+  delay(500); //wait 1 second before requesting again
 
 }
