@@ -1,7 +1,9 @@
 #include <ESP8266WiFi.h> //In cludes wifi library
 #include <ESP8266HTTPClient.h> //Includes http client library. (Allows for fetching of data)
 #include <Adafruit_NeoPixel.h> //RGB strip library
+#include <ArduinoJson.h>
 #define PIN 14 //set up rgb strip
+StaticJsonBuffer<200> jsonBuffer;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(5, PIN, NEO_GRB + NEO_KHZ800); // intalize the RGB strip
 
 // Your WiFi credentials.
@@ -14,7 +16,7 @@ void setup()
   // Debug console
   Serial.begin(9600);
   Serial.println("Init");
-  
+
   WiFi.begin(ssid, pass); //set up wifi
   while (WiFi.status() != WL_CONNECTED) { //wait untill wifi is connected
     Serial.print("Connecting.");
@@ -25,7 +27,7 @@ void setup()
 
   strip.begin();
   strip.show(); // Initialize all leds to 'off'
- 
+
 }
 
 void loop() {
@@ -39,9 +41,16 @@ void loop() {
 
     if (httpCode > 0) { //Check the returning code to see if the request was sucessfull
 
-      String turnOn = http.getString();   //Get the request response payload
+      char json[] = http.getString();   //Get the request response payload
+      JsonObject& root = jsonBuffer.parseObject(json);
+      if (!root.success()) {
+        Serial.println("parseObject() failed");
+        return false;
+      }
+
+      const bool* turnOn = root["on"];
       Serial.println(turnOn);
-      if (turnOn == "true") {
+      if (turnOn) {
         //turn on light
         strip.setPixelColor(0, 255, 255, 255);
         strip.setPixelColor(1, 255, 255, 255);
@@ -54,20 +63,20 @@ void loop() {
         strip.setPixelColor(1, 0, 0, 0);
         strip.setPixelColor(2, 0, 0, 0);
         strip.setPixelColor(3, 0, 0, 0);
-         strip.show();
+        strip.show();
       }
-           //Print the response payload
+      //Print the response payload
 
     } else {
       Serial.println('request failed');
       Serial.println(httpCode);
     }
-   
+
 
     http.end();   //Close connection
 
   }
 
-   delay(1000); //wait 1 second before requesting again
+  delay(1000); //wait 1 second before requesting again
 
 }
